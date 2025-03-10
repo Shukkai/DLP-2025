@@ -17,7 +17,6 @@ class Tanh(module):
         """Computes the Tanh activation function."""
         self.output = np.tanh(input)  # Store output for backpropagation
         return self.output
-
     def backward(self, grad: np.ndarray) -> np.ndarray:
         """Computes the derivative of Tanh activation."""
         return (1 - self.output ** 2) * grad  # Use stored output to compute derivative
@@ -118,20 +117,19 @@ class Linear_layer(module):
             self.bias -= adjusted_lr_bias * self.grad_bias  # Update bias
         return np.dot(grad_active, self.weights.T)
     
-class Conv1D(module):
-    def __init__(self, in_shape, out_shape, kernel_size=2, stride=1, active="sigmoid", optim="sgd", lr=0.01, epsilon=1e-8, beta=0.9) -> None:
+class Conv1D_layer(module):
+    def __init__(self, input_length, num_filters, kernel_size, stride=1, padding=0,
+                 active="sigmoid", optim="sgd", lr=0.1, epsilon=1e-8, beta=0.9) -> None:
         super().__init__()
-        self.weights = np.random.randn(out_shape, in_shape, kernel_size)
-        self.bias = np.zeros((1, out_shape))  # Initialize bias with zeros
-        self.optim = optim
-        self.beta = beta  # Momentum factor
-        self.G_bias = np.zeros_like(self.bias)
-        self.v_b = np.zeros_like(self.bias)  # Velocity for bias
-        self.epsilon = epsilon
-        self.G = np.zeros_like(self.weights)
-        self.v_w = np.zeros_like(self.weights)
+        self.input_length = input_length
+        self.num_filters = num_filters
+        self.kernel_size = kernel_size
         self.stride = stride
-        self.lr = lr
+        self.padding = padding
+        # He initialization for filters. Shape: (num_filters, 1, kernel_size)
+        self.weights = np.random.randn(num_filters, 1, kernel_size) * np.sqrt(2.0 / kernel_size)
+        self.bias = np.zeros((1, num_filters))
+        
         if active == "sigmoid":
             self.active = Sigmoid()
         elif active == "relu":
@@ -139,85 +137,81 @@ class Conv1D(module):
         elif active == "tan":
             self.active = Tanh()
         else:
-            self.active = module()  # No activation if not specified
-    def forward(self, input):
-        # Reshape input to have a channel dimension if it's 2D (single sample case)
-        if len(input.shape) == 2:
-            input = input.reshape(input.shape[0], 1, input.shape[1])  # (1, in_channels, input_length)
-
-        self.input = input
-        output_length = input.shape[2] - self.weights.shape[2] + 1
-        output = np.zeros((input.shape[0], self.weights.shape[0], output_length)) 
-
-        # Convolution operation
-        for i in range(output_length):
-            for j in range(self.weights.shape[0]):  # Iterate over output channels
-                output[:, j, i] = np.sum(input[:, :, i:i + self.weights.shape[2]] * self.weights[j], axis=(1, 2))
-
-        # Apply activation function
-        self.output = self.active.forward(output)
-        return self.output
-
-    def backward(self, gradwrtoutput):
-        # Backpropagate the gradients with respect to the output
-        # grad_active = self.active.backward(gradwrtoutput)
-        # out_channels, output_length = grad_active.shape
-        # in_channels, _, kernel_size = self.weights.shape
+            self.active = module()
+        self.optim = optim
+        self.lr = lr
+        self.epsilon = epsilon
+        self.beta = beta
+        self.G = np.zeros_like(self.weights)
+        self.G_bias = np.zeros_like(self.bias)
+        self.v_w = np.zeros_like(self.weights)
+        self.v_b = np.zeros_like(self.bias)
         
-        # # Initialize gradients
-        # dX = np.zeros_like(self.input)
-        # self.gradW = np.zeros_like(self.weights)
+    def forward(self, input):
+        self.input = input  # (batch_size, input_length)
+        batch_size = input.shape[0]
+        input_reshaped = input.reshape(batch_size, 1, self.input_length)
 
-        # # Gradient computation for the input and weights
-        # for i in range(output_length):
-        #     for j in range(in_channels):
-        #         for k in range(out_channels):
-        #             flipped_kernel = self.weights[k, j, ::-1]
-        #             valid_slice = slice(max(0, i * self.stride), min(self.input.shape[2], i * self.stride + kernel_size))
-        #             dX[:, j, valid_slice] += np.sum(gradwrtoutput[:, k, i:i + 1] * flipped_kernel[:, j], axis=0)
+        out_length = int((self.input_length - self.kernel_size + 2 * self.padding) / self.stride) + 1
 
-        # for i in range(out_channels):
-        #     for j in range(in_channels):
-        #         for k in range(kernel_size):
-        #             self.gradW[i, j, k] = np.sum(gradwrtoutput[:, i, :] * np.roll(self.X[:, j, :], -k, axis=2), axis=0)
-        batch_size, out_channels, output_length = gradwrtoutput.shape
-        in_channels, _, kernel_size = self.weights.shape
-        dX = np.zeros_like(self.input)
-        self.gradW = np.zeros_like(self.W)
-        for i in range(output_length):
-            for j in range(in_channels):
-                for k in range(out_channels):
-                    flipped_kernel = self.weights[k, :, ::-1]
-                    valid_slice = slice(max(0, i * self.stride), min(self.input.shape[2], i * self.stride + kernel_size))
-                    dX[:, j, valid_slice] += np.sum(gradwrtoutput[:, k, i:i + 1] * flipped_kernel[:, j], axis=0)
+        if self.padding > 0:
+            self.input_padded = np.pad(input_reshaped, ((0,0), (0,0), (self.padding, self.padding)), mode='constant')
+        else:
+            self.input_padded = input_reshaped
+        
+        padded_length = self.input_padded.shape[2]
+        self.pre_activation = np.zeros((batch_size, self.num_filters, out_length))
+        
+        for b in range(batch_size):
+            for f in range(self.num_filters):
+                for i in range(out_length):
+                    start = i * self.stride
+                    end = start + self.kernel_size
+                    region = self.input_padded[b, 0, start:end]
+                    self.pre_activation[b, f, i] = np.sum(region * self.weights[f, 0, :]) + self.bias[0, f]
+                    
+        self.out = self.active.forward(self.pre_activation)
+        return self.out
 
-        for i in range(out_channels):
-            for j in range(in_channels):
-                for k in range(kernel_size):
-                    self.gradW[i, j, k] = np.sum(gradwrtoutput[:, i, :] * np.roll(self.X[:, j, :], -k, axis=2), axis=0)
-
-        return dX
-        # if self.optim == "sgd":
-        #     self.weights -= self.lr * self.grad_weight
-        #     self.bias -= self.lr * self.grad_bias  # Update bias
-
-        # elif self.optim == "mom":
-        #     # Apply Momentum Update
-        #     self.v_w = self.beta * self.v_w + (1 - self.beta) * self.grad_weight
-        #     self.v_b = self.beta * self.v_b + (1 - self.beta) * self.grad_bias
-
-        #     self.weights -= self.lr * self.v_w
-        #     self.bias -= self.lr * self.v_b
-
-        # elif self.optim == "ada":
-        #     self.G += self.grad_weight ** 2
-        #     self.G_bias += self.grad_bias ** 2
-
-        #     adjusted_lr = self.lr / (np.sqrt(self.G) + self.epsilon)
-        #     adjusted_lr_bias = self.lr / (np.sqrt(self.G_bias) + self.epsilon)
-
-        #     self.weights -= adjusted_lr * self.grad_weight
-        #     self.bias -= adjusted_lr_bias * self.grad_bias  # Update bias
-
-        # return dX
-
+    def backward(self, grad):
+        grad_active = self.active.backward(grad)
+        batch_size = self.input.shape[0]
+        out_length = grad_active.shape[2]
+        
+        d_weights = np.zeros_like(self.weights)
+        d_bias = np.zeros_like(self.bias)
+        d_input_padded = np.zeros_like(self.input_padded)
+        
+        for b in range(batch_size):
+            for f in range(self.num_filters):
+                for i in range(out_length):
+                    start = i * self.stride
+                    end = start + self.kernel_size
+                    region = self.input_padded[b, 0, start:end]
+                    
+                    d_weights[f, 0, :] += grad_active[b, f, i] * region
+                    d_bias[0, f] += grad_active[b, f, i]
+                    d_input_padded[b, 0, start:end] += grad_active[b, f, i] * self.weights[f, 0, :]
+        
+        if self.padding > 0:
+            d_input = d_input_padded[:, 0, self.padding:-self.padding]
+        else:
+            d_input = d_input_padded[:, 0, :]
+        
+        if self.optim == "sgd":
+            self.weights -= self.lr * d_weights
+            self.bias -= self.lr * d_bias
+        elif self.optim == "mom":
+            self.v_w = self.beta * self.v_w + (1 - self.beta) * d_weights
+            self.v_b = self.beta * self.v_b + (1 - self.beta) * d_bias
+            self.weights -= self.lr * self.v_w
+            self.bias -= self.lr * self.v_b
+        elif self.optim == "ada":
+            self.G += d_weights ** 2
+            self.G_bias += d_bias ** 2
+            adjusted_lr = self.lr / (np.sqrt(self.G) + self.epsilon)
+            adjusted_lr_bias = self.lr / (np.sqrt(self.G_bias) + self.epsilon)
+            self.weights -= adjusted_lr * d_weights
+            self.bias -= adjusted_lr_bias * d_bias
+        
+        return d_input

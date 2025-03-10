@@ -3,16 +3,16 @@ from model import Linear_Model, Conv_Model, Linear_wo_active_Model
 from plotting import show_loss, show_result
 import numpy as np
 
-def train_test(experiment, layer_type = "linear", epochs = 100001, active = "sigmoid", optim = "sgd", lr = 1e-6):
-    print(experiment+" "+ layer_type)
+def train_test(experiment, layer_type = "linear", epochs = 100001,hidden_size=4, active = "sigmoid", optim = "sgd", lr = 1e-4):
+    print("current data: "+experiment)
     if experiment == "linear":
         X, y = generate_linear(100)
     else:
         X, y =generate_XOR_easy()
     if layer_type == "linear":
-        model = Linear_Model(X, y, lr = lr, activate = active, optim= optim)
+        model = Linear_Model(X, y, lr = lr,hidden_size=hidden_size, activate = active, optim= optim)
     elif layer_type == "conv":
-        model = Conv_Model(X,y,lr=lr,activate=active,optim=optim)
+        model = Conv_Model(X,y,lr=lr,conv_filters=hidden_size, activate_conv=active,optim=optim)
     else:
         model = Linear_wo_active_Model(X, y)
     losses = []
@@ -36,20 +36,42 @@ def train_test(experiment, layer_type = "linear", epochs = 100001, active = "sig
     show_result(X_test, y_test, pred_label)
 
 if __name__ == "__main__":
-    # train_test("linear", layer_type="linear", active="sigmoid", lr = 1e-4)
-    # train_test("linear", layer_type="none", lr = 1e-6)
-    # train_test("linear", layer_type="linear", optim="ada", lr = 1e-6)
-    # train_test("linear", layer_type="linear", optim="sgd", lr = 1e-6)
-    # train_test("linear", layer_type="linear", optim="sgd", lr = 1e-3)
-    # train_test("xor",optim="sgd",lr= 1e-3)
-    # train_test("xor",optim="sgd",lr= 1e-6)
-    # train_test("xor",optim="sgd",lr= 0.01)
-    # train_test("xor",optim="ada",lr= 0.01)
-    # train_test("xor",optim="mom",lr= 0.01)
-    # train_test("linear", layer_type="linear", active="sigmoid", lr = 1e-6)
-    train_test("linear", layer_type="linear", active="relu", lr = 1e-4)
-    # train_test("linear", layer_type="linear", active="tan", lr = 1e-4)
-    # train_test("xor",layer_type="none",lr=1e-3)
-    # train_test("xor",active="sigmoid",lr= 0.01)
-    # train_test("xor",active="tan",lr= 1e-4)
-    # train_test("xor",active="relu",lr=1e-4)
+    """basic"""
+    train_test("linear")
+    train_test("xor")
+
+    """no activation function"""
+    # train_test("linear", layer_type="none",lr=1e-6,hidden_size=2)
+    # train_test("xor",layer_type="none",lr=1e-6,hidden_size=2)
+
+    """different activation"""
+    # train_test("linear", layer_type="linear", active="sigmoid")
+    # train_test("linear", layer_type="linear", active="relu")
+    # train_test("linear", layer_type="linear", active="tan")
+    # train_test("xor",active="sigmoid")
+    # train_test("xor",active="tan")
+    # train_test("xor",active="relu")
+
+    """different optimizer"""
+    # train_test("linear",optim="sgd")
+    # train_test("linear", optim="ada")
+    # train_test("linear", optim="mom")
+    # train_test("xor",optim="sgd")
+    # train_test("xor",optim="ada")
+    # train_test("xor",optim="mom")
+
+    """different lr"""
+    # train_test("linear",lr=1e-3)
+    # train_test("linear",lr=1e-6)
+    # train_test("xor",lr= 1e-3)
+    # train_test("xor",lr= 1e-6)
+
+    """different hidden units"""
+    # train_test("linear",hidden_size=4)
+    # train_test("linear",hidden_size=10)
+    # train_test("xor",hidden_size=4)
+    # train_test("xor",hidden_size=10)
+
+    """conv layer"""
+    # train_test("linear",layer_type="conv",lr=1e-2)
+    # train_test("xor",layer_type="conv",lr=1e-1)
