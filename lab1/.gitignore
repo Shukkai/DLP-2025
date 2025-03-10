@@ -12,3 +12,7 @@ env/
 
 # Ignore log files (optional)
 *.log
+
+*.zip
+
+*lab1_pic
