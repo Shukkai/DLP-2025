@@ -22,8 +22,8 @@ def train_test(experiment, layer_type = "linear", epochs = 100001, active = "sig
         losses.append(loss)
         if epoch % 5000 == 0:
             print(f"epoch {epoch} loss : {loss:.10f}")
-    # show_loss(losses, experiment+"_"+active+"_"+optim+"_loss.png")
-    print("####testing####")
+    show_loss(losses, experiment+"_"+active+"_"+optim+"_loss.png")
+    # print("####testing####")
     if experiment == "linear":
         X_test, y_test = generate_linear(100)
     else:
@@ -36,5 +36,18 @@ def train_test(experiment, layer_type = "linear", epochs = 100001, active = "sig
     # show_result(X_test, y_test, pred_label)
 
 if __name__ == "__main__":
-    train_test("linear", layer_type="none", active="none", lr = 1e-6)
-    # train_test("xor",lr= 0.01)
+    train_test("linear", layer_type="linear", active="sigmoid", lr = 1e-6)
+    # train_test("linear", layer_type="none", lr = 1e-6)
+    # train_test("linear", layer_type="linear", optim="ada", lr = 1e-6)
+    # train_test("linear", layer_type="linear", optim="sgd", lr = 1e-6)
+    # train_test("linear", layer_type="linear", optim="sgd", lr = 1e-3)
+    # train_test("xor",optim="sgd",lr= 1e-3)
+    train_test("xor",optim="sgd",lr= 1e-6)
+    # train_test("xor",optim="sgd",lr= 0.01)
+    # train_test("xor",optim="ada",lr= 0.01)
+    # train_test("xor",optim="mom",lr= 0.01)
+    # train_test("linear", layer_type="linear", active="sigmoid", lr = 1e-6)
+    # train_test("linear", layer_type="linear", active="relu", optim="sigmoid", lr = 1e-6)
+    # train_test("xor",layer_type="none",lr=1e-3)
+    # train_test("xor",active="sigmoid",lr= 0.01)
+    # train_test("xor",active="tan",lr= 1e-6)

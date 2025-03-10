@@ -26,7 +26,7 @@ class Linear_wo_active_Model:
         return loss
     
 class Linear_Model:
-    def __init__(self, X, y, hidden_size=10, lr=0.001,activate = "sigmoid",optim = "sgd"):
+    def __init__(self, X, y, hidden_size=10, lr=0.001,activate = "tan",optim = "sgd"):
         super().__init__()
         self.X = X
         self.y = y
@@ -55,21 +55,17 @@ class Conv_Model:
         self.X = X
         self.y = y
         # Initialize convolutional layers
-        self.layer1 = Linear_layer(input_size=X.shape[1], output_size=1, active=activate, optim=optim, lr=lr)
+        self.layer1 = Linear_layer(self.X.shape[1],hidden_size, activate, optim)
         self.layer2 = Conv1D(in_shape=hidden_size, out_shape=hidden_size, kernel_size=2, stride=1, active=activate, optim=optim, lr=lr)
         # The final layer is a Linear layer to output a scalar (regression task)
-        self.layer3 = Linear_layer(input_size=hidden_size, output_size=1, active=activate, optim=optim, lr=lr)
+        self.layer3 = Linear_layer(3,1, activate, optim)
         self.lr = lr
     
     def forward(self, input):
-        input = input.reshape(input.shape[0], 2, 1)  # Reshape to (batch_size, 2, 1)
         # Pass the input through the convolutional layers
         out1 = self.layer1.forward(input)  # Output shape (batch_size, 10, output_length)
         out2 = self.layer2.forward(out1)   # Output shape (batch_size, 10, output_length)
-        # Flatten the output of the convolutional layers before passing to the linear layer
-        out2_flat = out2.flatten(axis=1)  # Flatten (batch_size, 10, output_length) to (batch_size, 10*output_length)
-        # Final linear layer to produce the output (1 output per batch)
-        out3 = self.layer3.forward(out2_flat)
+        out3 = self.layer3.forward(out2)
         return out3
     
     def backward(self):
