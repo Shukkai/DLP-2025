@@ -13,7 +13,6 @@ class module():
 class Tanh(module):
     def __init__(self):
         pass  # No need for initialization
-
     def forward(self, input: np.ndarray) -> np.ndarray:
         """Computes the Tanh activation function."""
         self.output = np.tanh(input)  # Store output for backpropagation
@@ -28,9 +27,11 @@ class ReLU(module):
         super().__init__()
     def forward(self, input)->np.ndarray:
         self.input = input
-        return np.where(self.input > 0, self.input, 0)
+        self.out = np.maximum(0, input)
+        return np.maximum(0, input)
     def backward(self, grad)->np.ndarray:
-        return np.where(grad > 0, 1, 0) * grad
+        # Use the stored input to create the mask for the gradient
+        return grad * (self.out > 0)
 
 class Sigmoid(module):
     def __init__(self)->None:
@@ -72,8 +73,8 @@ class Linear_layer_wo_active(module):
 class Linear_layer(module):
     def __init__(self, input_size, output_size, active="sigmoid", optim="sgd", lr=0.1, epsilon=1e-8, beta=0.9) -> None:
         super().__init__()
-        self.weights = np.random.randn(input_size, output_size) * np.sqrt(2.0 / input_size)  # He Initialization
-        self.bias = np.zeros((1, output_size))  # Initialize bias with zeros
+        self.weights = np.random.randn(input_size, output_size) * np.sqrt(2.0 / input_size)
+        self.bias = np.zeros((1, output_size))
         if active == "sigmoid":
             self.active = Sigmoid()
         elif active == "relu":
@@ -92,7 +93,7 @@ class Linear_layer(module):
         self.v_b = np.zeros_like(self.bias)  # Velocity for bias
     def forward(self, input):
         self.input = input
-        self.grad = self.active.forward(np.dot(self.input, self.weights) + self.bias)  # Apply bias
+        self.grad = self.active.forward(np.dot(self.input, self.weights)+self.bias)  # Apply bias
         return self.grad
     def backward(self, grad):
         grad_active = self.active.backward(grad)
@@ -136,7 +137,7 @@ class Conv1D(module):
         elif active == "relu":
             self.active = ReLU()
         elif active == "tan":
-            self.active = tan()
+            self.active = Tanh()
         else:
             self.active = module()  # No activation if not specified
     def forward(self, input):

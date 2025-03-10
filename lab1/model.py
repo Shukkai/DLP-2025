@@ -26,13 +26,13 @@ class Linear_wo_active_Model:
         return loss
     
 class Linear_Model:
-    def __init__(self, X, y, hidden_size=10, lr=0.001,activate = "tan",optim = "sgd"):
+    def __init__(self, X, y, hidden_size=4, lr=0.001,activate = "sigmoid",optim = "sgd"):
         super().__init__()
         self.X = X
         self.y = y
         self.layer1 =  Linear_layer(self.X.shape[1],hidden_size, activate, optim)
-        self.layer2 =  Linear_layer(hidden_size,hidden_size, activate, optim)
-        self.layer3 =  Linear_layer(hidden_size,1, activate, optim) # flatten
+        self.layer2 =  Linear_layer(hidden_size,hidden_size, "sigmoid", optim)
+        self.layer3 =  Linear_layer(hidden_size,1, "sigmoid", optim) # flatten
         self.lr = lr
     def forward(self, input):
         self.w1 = self.layer1.forward(input)
@@ -41,8 +41,8 @@ class Linear_Model:
         return self.w3
     def backward(self):
         y = self.forward(self.X)
-        loss = np.mean((self.y - y) ** 2)
-        dloss = 2*(y-self.y) #derivative
+        loss = np.mean((y - self.y) ** 2) # gt - pred
+        dloss = 2*(y - self.y) #derivative
         #backpropagration
         dw3 = self.layer3.backward(dloss)
         dw2 = self.layer2.backward(dw3)
