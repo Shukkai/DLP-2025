@@ -1,3 +1,3 @@
-NYCU Deep Learning programming 2025 FALL
-------------------------------------------------
+NYCU 2025 Spring Deep Learning programming
+=======
 Lab1 Backpropagation
