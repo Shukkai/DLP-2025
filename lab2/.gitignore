@@ -1,22 +1,14 @@
-# Ignore Python cache files
-__pycache__/
-*.pyc
-*.pyo
-
-# Ignore PNG images
+# Ignore image files and PyTorch model files
 *.png
 *.jpg
-
-# Ignore virtual environments (optional)
-venv/
-env/
-
-# Ignore log files (optional)
-*.log
-
-*.zip
-
-.DS_Store
-
-
 *.pt
+
+# Ignore the Oxford-IIIT Pet dataset folder
+/dataset/oxford-iiit-pet/
+
+# Ignore Visual Studio Code settings
+.vscode/
+
+# Ignore Python cache directories
+__pycache__/
+.pycache/

@@ -1,5 +1,4 @@
 from tqdm import tqdm
-import argparse
 import torch
 import os
 from torch import nn, optim
@@ -7,31 +6,23 @@ from torch.cuda.amp import autocast, GradScaler
 
 from oxford_pet import OxfordPetData
 from models.unet import UNet
-from utils import dice_score
+from models.resnet34_unet import ResNet34_UNet
+from utils import dice_score, parse_arguments
 from evaluate import evaluate
 
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-def parse_arguments():
-    parser = argparse.ArgumentParser(description="Training.")
-    parser.add_argument("--model", type=str, default= "unet", required=False, help="unet or resnet34")
-    parser.add_argument("--path", type=str, default="../dataset/oxford-iiit-pet/", required=True, help="Data root path(relative)")
-    parser.add_argument("--epoches", type=int, default=101, required=False, help="Epoches #")
-    parser.add_argument("--batch", type=int, default= 8 ,required = False, help="Batch size")
-    parser.add_argument("--learning_rate", type=float, default=1e-4, required=False, help="Learning rate #")
 
-    args = parser.parse_args()
-    return args
 
 def train(args, model, train_loader, valid_loader):
     losses, dices = [], []
     optimizer = optim.Adam(model.parameters(), lr=args.learning_rate)
-    scheduler = optim.lr_scheduler.ExponentialLR(optimizer, 0.5)
+    scheduler = optim.lr_scheduler.StepLR(optimizer, step_size=10, gamma=args.lr_scheduler)
     critirion = nn.BCEWithLogitsLoss()
     scaler = GradScaler()  # Helps stabilize float16 training
 
-    save_dir = "../saved_models"
+    save_dir = os.path.join(args.root,"saved_models/")
     os.makedirs(save_dir, exist_ok=True)  # 🔥 Ensure directory exists
-    checkpoint_path = os.path.join(save_dir, "best_model.pt")
+    checkpoint_path = os.path.join(save_dir, f"{args.model}_best_model.pt")
     best_dice = 0.0
     for ep in range(args.epoches):
         train_loss = 0.0
@@ -46,6 +37,7 @@ def train(args, model, train_loader, valid_loader):
             # Enable Mixed Precision (float16)
             with autocast():  
                 pred_mask = model(img)  # Ensure model outputs (N, C, H, W)
+                # print(pred_mask.shape)
                 loss = critirion(pred_mask, mask)  # Compute loss
 
             # Backward pass using FP16 scaling
@@ -93,12 +85,17 @@ def train(args, model, train_loader, valid_loader):
 
 if __name__ == "__main__":
     args = parse_arguments()
-    data_module = OxfordPetData(root_dir=args.path, batch_size=args.batch, num_workers=4)
+    if args.model == "unet":
+        print("Using unet")
+        model = UNet(3,1).to(device)
+    else:
+        print("Using resnet34_unet")
+        model = ResNet34_UNet(3,1).to(device)
+    print("####Loading Data####")
+    data_module = OxfordPetData(root_dir=args.root, batch_size=args.batch, num_workers=4)
     train_loader, valid_loader, test_loader = data_module.get_dataloaders()
-    model = UNet(3,1).to(device)
+    print("####Training####")
     train(args= args,model=model, train_loader=train_loader, valid_loader=valid_loader)
-    test_dice = evaluate(test_loader)
-    print(f"🚀 Test Dice Score (Merged Classes): {test_dice:.4f}")
     
 # class data_prefetcher:
 #     def __init__(self, loader):
