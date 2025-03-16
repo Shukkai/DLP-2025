@@ -2,9 +2,8 @@ import torch
 from tqdm import tqdm
 from utils import dice_score
 
-device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
-def evaluate(model, test_loader):
+def evaluate(device, model, test_loader):
     
     model.to(device)
     model.eval()

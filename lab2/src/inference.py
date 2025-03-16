@@ -30,5 +30,5 @@ if __name__ == "__main__":
     data_module = OxfordPetData(root_dir=args.root, batch_size=args.batch, num_workers=8)
     _, _, test_loader = data_module.get_dataloaders()
     print("####Testing####")
-    dice = evaluate(model=model, test_loader=test_loader)
+    dice = evaluate(device=device, model=model, test_loader=test_loader)
     print(f"Dice score : {dice:.4f}")
