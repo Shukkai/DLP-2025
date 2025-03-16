@@ -17,11 +17,11 @@ def train(args, model, train_loader, valid_loader):
     device = torch.device(f"cuda:{args.cuda}" if torch.cuda.is_available() else "cpu")
     optimizer = optim.Adam(model.parameters(), lr=args.learning_rate)
     scheduler = optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=args.epoches, eta_min=1e-5)
-    critirion = nn.BCEWithLogitsLoss()
-    # critirion = BCEDiceLoss(weight_bce=0.5, weight_dice=0.5, use_logits=True)
+    # critirion = nn.BCEWithLogitsLoss()
+    critirion = BCEDiceLoss(weight_bce=0.5, weight_dice=0.5, use_logits=True)
     scaler = GradScaler()  # Helps stabilize float16 training
     save_dir = os.path.join(args.root,"saved_models/")
-    os.makedirs(save_dir, exist_ok=True)  # 🔥 Ensure directory exists
+    os.makedirs(save_dir, exist_ok=True)  # Ensure directory exists
     checkpoint_path = os.path.join(save_dir, f"{args.model}_best_model.pt")
     best_dice = 0.0
     for ep in range(args.epoches):
@@ -84,6 +84,7 @@ def train(args, model, train_loader, valid_loader):
 
 if __name__ == "__main__":
     args = parse_arguments()
+    device = torch.device(f"cuda:{args.cuda}" if torch.cuda.is_available() else "cpu")
     if args.model == "unet":
         print("Using unet")
         model = UNet(3,1).to(device)
