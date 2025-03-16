@@ -7,11 +7,9 @@ from models.resnet34_unet import ResNet34_UNet
 from evaluate import evaluate
 from oxford_pet import OxfordPetData
 
-device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-
 if __name__ == "__main__":
     args = parse_arguments()
-
+    device = torch.device(f"cuda:{args.cuda}" if torch.cuda.is_available() else "cpu")
     if args.model == "unet":
         print("Using unet")
         model = UNet(3,1).to(device)

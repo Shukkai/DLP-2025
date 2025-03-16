@@ -7,19 +7,19 @@ from torch.cuda.amp import autocast, GradScaler
 from oxford_pet import OxfordPetData
 from models.unet import UNet
 from models.resnet34_unet import ResNet34_UNet
-from utils import dice_score, parse_arguments
+from utils import dice_score, parse_arguments, BCEDiceLoss
 from evaluate import evaluate
 
-device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
 
 def train(args, model, train_loader, valid_loader):
     losses, dices = [], []
+    device = torch.device(f"cuda:{args.cuda}" if torch.cuda.is_available() else "cpu")
     optimizer = optim.Adam(model.parameters(), lr=args.learning_rate)
-    scheduler = optim.lr_scheduler.StepLR(optimizer, step_size=10, gamma=args.lr_scheduler)
+    scheduler = optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=args.epoches, eta_min=1e-5)
     critirion = nn.BCEWithLogitsLoss()
+    # critirion = BCEDiceLoss(weight_bce=0.5, weight_dice=0.5, use_logits=True)
     scaler = GradScaler()  # Helps stabilize float16 training
-
     save_dir = os.path.join(args.root,"saved_models/")
     os.makedirs(save_dir, exist_ok=True)  # 🔥 Ensure directory exists
     checkpoint_path = os.path.join(save_dir, f"{args.model}_best_model.pt")
@@ -36,8 +36,7 @@ def train(args, model, train_loader, valid_loader):
             optimizer.zero_grad()
             # Enable Mixed Precision (float16)
             with autocast():  
-                pred_mask = model(img)  # Ensure model outputs (N, C, H, W)
-                # print(pred_mask.shape)
+                pred_mask = model(img)  # Ensure model outputs (N, C, H, Wd)
                 loss = critirion(pred_mask, mask)  # Compute loss
 
             # Backward pass using FP16 scaling
@@ -76,7 +75,7 @@ def train(args, model, train_loader, valid_loader):
         print(f"Epoch {ep+1}, Loss: {train_loss:.4f}, Dice Score: {dice:.4f}, LR: {scheduler.get_last_lr()[0]:.6f}")
 
         # Step the LR Scheduler
-        # scheduler.step()
+        scheduler.step()
 
         # Save Metrics
         losses.append(train_loss)
