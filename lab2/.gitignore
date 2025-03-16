@@ -1,0 +1,22 @@
+# Ignore Python cache files
+__pycache__/
+*.pyc
+*.pyo
+
+# Ignore PNG images
+*.png
+*.jpg
+
+# Ignore virtual environments (optional)
+venv/
+env/
+
+# Ignore log files (optional)
+*.log
+
+*.zip
+
+.DS_Store
+
+
+*.pt
