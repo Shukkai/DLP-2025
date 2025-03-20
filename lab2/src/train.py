@@ -1,5 +1,7 @@
 from tqdm import tqdm
 import torch
+import random
+import numpy as np
 import os
 from torch import nn, optim
 from torch.cuda.amp import autocast, GradScaler
@@ -7,22 +9,50 @@ from torch.cuda.amp import autocast, GradScaler
 from oxford_pet import OxfordPetData
 from models.unet import UNet
 from models.resnet34_unet import ResNet34_UNet
-from utils import dice_score, parse_arguments, BCEDiceLoss
+from utils import dice_score, parse_arguments, BCEDiceLoss, plot_metrics
 from evaluate import evaluate
 
+seed = 42
 
+# Set the Python built-in random module seed
+random.seed(seed)
+
+# Set the NumPy random seed
+np.random.seed(seed)
+
+# Set the PyTorch random seed for CPU
+torch.manual_seed(seed)
+
+# If using GPU, set the PyTorch CUDA random seed
+if torch.cuda.is_available():
+    torch.cuda.manual_seed(seed)
+    torch.cuda.manual_seed_all(seed)
+
+# For deterministic behavior in cuDNN
+torch.backends.cudnn.deterministic = True
+torch.backends.cudnn.benchmark = False
 
 def train(args, model, train_loader, valid_loader):
     losses, dices = [], []
     device = torch.device(f"cuda:{args.cuda}" if torch.cuda.is_available() else "cpu")
-    optimizer = optim.Adam(model.parameters(), lr=args.learning_rate)
-    scheduler = optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=args.epoches, eta_min=1e-5)
-    # critirion = nn.BCEWithLogitsLoss()
-    critirion = BCEDiceLoss(weight_bce=0.5, weight_dice=0.5, use_logits=True)
+    if args.optim == "Adam":
+        optimizer = optim.Adam(model.parameters(), lr=args.learning_rate)
+    elif args.optim == "AdamW":
+        optimizer = optim.AdamW(model.parameters(), lr=args.learning_rate)
+    else:
+        optimizer = optim.SGD(model.parameters(), lr=args.learning_rate, momentum=0.9)
+    if args.scheduler == "Cos":
+        scheduler = optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=args.epoches, eta_min=args.lr_eta)
+    else:
+        scheduler = optim.lr_scheduler.ExponentialLR(optimizer, gamma=0.999)
+    if args.loss_func == "BCE":
+        critirion = nn.BCEWithLogitsLoss()
+    else:
+        critirion = BCEDiceLoss(weight_bce=0.5, weight_dice=0.5, use_logits=True)
     scaler = GradScaler()  # Helps stabilize float16 training
     save_dir = os.path.join(args.root,"saved_models/")
     os.makedirs(save_dir, exist_ok=True)  # Ensure directory exists
-    checkpoint_path = os.path.join(save_dir, f"{args.model}_best_model.pt")
+    checkpoint_path = os.path.join(save_dir, f"{args.model}_best_model.pth")
     best_dice = 0.0
     for ep in range(args.epoches):
         train_loss = 0.0
@@ -80,6 +110,16 @@ def train(args, model, train_loader, valid_loader):
         # Save Metrics
         losses.append(train_loss)
         dices.append(dice)
+    with open(f"./saved_data/{args.model}_{args.loss_func}_{args.learning_rate}_{args.optim}_{args.scheduler}_loss_cmp.txt","a") as f:
+        f.write(f"losses :\n")
+        output_str = "\n".join(str(item) for item in losses)
+        f.write(output_str)
+    with open(f"./saved_data/{args.model}_{args.loss_func}_{args.learning_rate}_{args.optim}_{args.scheduler}_dice_cmp.txt","a") as f:
+        f.write(f"dices :\n")
+        output_str = "\n".join(str(item) for item in dices)
+        f.write(output_str)
+    save_dir = os.path.join("./saved_fig",f"{args.model}_{args.loss_func}_lr{args.learning_rate}_loss_dice.png")
+    plot_metrics(save_dir = save_dir,epochs= args.epoches, loss_values=losses, dice_scores= dices)
 
 
 if __name__ == "__main__":

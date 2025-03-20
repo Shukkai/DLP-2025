@@ -10,6 +10,11 @@ from torch.utils.data import Dataset, DataLoader
 import torch.nn.functional as F
 import torchvision.transforms.functional as TF
 
+seed = 42
+
+# Set the Python built-in random module seed
+random.seed(seed)
+
 def joint_transform(image, mask, degrees=15, flip_prob=0.5):
     """
     Applies a random rotation to both the image and mask, then converts them to tensors.
@@ -41,7 +46,7 @@ def joint_transform(image, mask, degrees=15, flip_prob=0.5):
     return image_tensor, mask_tensor
 
 class Read_data(Dataset):
-    def __init__(self, root, list_file, transform=None, H=256, W=256, indices=None, is_test = False):
+    def __init__(self, root, list_file, H=256, W=256, indices=None, is_test = False):
         """
         Args:
             data_path (str): Root directory of the dataset.
@@ -54,7 +59,6 @@ class Read_data(Dataset):
         self.H = H
         self.W = W
         self.data_path = root
-        self.transform = transform
         df = pd.read_csv(list_file, sep=" ", header=None)
         names = df[0].values
         self.image_paths = [os.path.join(self.data_path, f"images/{name}.jpg") for name in names]
@@ -74,11 +78,11 @@ class Read_data(Dataset):
         mask_path = self.mask_paths[idx]
 
         try:
-            # Read and process the image using PIL (No NumPy)
+            # Read and process the image using PIL
             image = Image.open(img_path).convert("RGB")  # Convert to RGB
             image = image.resize((self.W, self.H))
 
-            # Read and process the mask using PIL (No NumPy)
+            # Read and process the mask using PIL
             mask = Image.open(mask_path).convert("L")  # Convert to grayscale
             mask = mask.resize((self.W, self.H), resample=Image.NEAREST)
 
@@ -93,8 +97,8 @@ class Read_data(Dataset):
             mask = torch.where(mask == 1.0/255.0, 1.0, mask)  # Convert 1 → 0
             mask = torch.where(mask == 3.0/255.0, 1.0, mask)  # Convert 3 → 0
             mask = torch.where(mask == 2.0/255.0, 0.0, mask)  # Convert 2 → 1
-
             return image, mask
+
         except Exception as e:
             print(f"Skipping corrupted image: {img_path}, Error: {e}")
             return None, None  # Handle corrupted images

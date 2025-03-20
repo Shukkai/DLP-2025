@@ -1,27 +1,40 @@
 import torch
 import torch.nn as nn
 
-class EncoderBlock(nn.Module):
+class ConvBlock(nn.Module):
     """
-    An encoder block that applies two 3x3 convolutions with BatchNorm and ReLU,
-    then downsamples using 2x2 max pooling.
-
-    Returns:
-        pooled: Downsampled feature map.
-        features: Feature map before pooling (for skip connections).
+    Basic convolutional block:
+    - Two 3x3 convolutions (with padding=1) 
+    - Each convolution is followed by BatchNorm and ReLU.
     """
     def __init__(self, in_channels, out_channels):
-        super(EncoderBlock, self).__init__()
-        self.conv_block = nn.Sequential(
+        super(ConvBlock, self).__init__()
+        self.conv = nn.Sequential(
             nn.Conv2d(in_channels, out_channels, kernel_size=3, padding=1),
             nn.BatchNorm2d(out_channels),
             nn.ReLU(inplace=True),
             nn.Conv2d(out_channels, out_channels, kernel_size=3, padding=1),
             nn.BatchNorm2d(out_channels),
-            nn.ReLU(inplace=True),
+            nn.ReLU(inplace=True)
         )
-        self.pool = nn.MaxPool2d(kernel_size=2, stride=2)
+    
+    def forward(self, x):
+        return self.conv(x)
 
+
+class EncoderBlock(nn.Module):
+    """
+    Encoder block that applies a ConvBlock and then downsamples via max pooling.
+    
+    Returns:
+        pooled: The downsampled feature map.
+        features: The output of the ConvBlock (to be used as a skip connection).
+    """
+    def __init__(self, in_channels, out_channels):
+        super(EncoderBlock, self).__init__()
+        self.conv_block = ConvBlock(in_channels, out_channels)
+        self.pool = nn.MaxPool2d(kernel_size=2, stride=2)
+    
     def forward(self, x):
         features = self.conv_block(x)
         pooled = self.pool(features)
@@ -30,33 +43,30 @@ class EncoderBlock(nn.Module):
 
 class DecoderBlock(nn.Module):
     """
-    A decoder block that upsamples the input, crops and concatenates the corresponding
-    encoder feature map (skip connection), and then applies two 3x3 convolutions
-    with BatchNorm and ReLU.
+    Decoder block that upsamples the input, concatenates it with the corresponding 
+    encoder features (skip connection), and applies a ConvBlock.
+    
+    Args:
+        in_channels (int): Number of channels in the input to be upsampled.
+        out_channels (int): Number of channels after upsampling and processing.
     """
     def __init__(self, in_channels, out_channels):
         super(DecoderBlock, self).__init__()
-        # in_channels here is the number of channels from the previous layer (to be upsampled)
+        # Upsample the input to double its spatial dimensions
         self.upsample = nn.ConvTranspose2d(in_channels, out_channels, kernel_size=2, stride=2)
-        # After upsampling, we concatenate with the skip connection,
-        # so the number of input channels for the conv block is out_channels*2.
-        self.conv_block = nn.Sequential(
-            nn.Conv2d(out_channels * 2, out_channels, kernel_size=3, padding=1),
-            nn.BatchNorm2d(out_channels),
-            nn.ReLU(inplace=True),
-            nn.Conv2d(out_channels, out_channels, kernel_size=3, padding=1),
-            nn.BatchNorm2d(out_channels),
-            nn.ReLU(inplace=True),
-        )
-
+        # After upsampling, the skip connection (from the encoder) has out_channels.
+        # Their concatenation yields 2*out_channels channels.
+        self.conv_block = ConvBlock(out_channels * 2, out_channels)
+    
     def forward(self, x, skip):
         x = self.upsample(x)
-        # Center-crop the skip connection if necessary to match x's spatial size.
+        # If necessary, center-crop the skip connection to match x's spatial size.
         if x.size()[2:] != skip.size()[2:]:
             diff_y = skip.size(2) - x.size(2)
             diff_x = skip.size(3) - x.size(3)
-            skip = skip[:, :, diff_y // 2: diff_y // 2 + x.size(2), diff_x // 2: diff_x // 2 + x.size(3)]
-        # Concatenate along the channel dimension.
+            skip = skip[:, :, diff_y // 2: diff_y // 2 + x.size(2),
+                          diff_x // 2: diff_x // 2 + x.size(3)]
+        # Concatenate along the channel dimension and apply the conv block.
         x = torch.cat([skip, x], dim=1)
         x = self.conv_block(x)
         return x
@@ -64,53 +74,52 @@ class DecoderBlock(nn.Module):
 
 class UNet(nn.Module):
     """
-    U-Net architecture that consists of:
-      - Four encoder blocks.
-      - A center block.
-      - Four decoder blocks.
-      - A final 1x1 convolution mapping features to the desired number of classes.
+    U-Net architecture for semantic segmentation. It comprises:
+      - Four encoder blocks for downsampling.
+      - A bottleneck center block (a ConvBlock without pooling).
+      - Four decoder blocks for upsampling and merging skip connections.
+      - A final 1x1 convolution mapping to the desired number of output classes.
+    
+    Args:
+        in_channels (int): Number of channels in the input image.
+        out_channels (int): Number of segmentation classes (or output channels).
     """
     def __init__(self, in_channels, out_channels):
         super(UNet, self).__init__()
-        # Encoder: downsampling
-        self.encoder1 = EncoderBlock(in_channels, 64)
-        self.encoder2 = EncoderBlock(64, 128)
-        self.encoder3 = EncoderBlock(128, 256)
-        self.encoder4 = EncoderBlock(256, 512)
+        # Encoder: Downsample the image while saving skip connections.
+        self.enc1 = EncoderBlock(in_channels, 64)    # Output: features with 64 channels.
+        self.enc2 = EncoderBlock(64, 128)              # Output: features with 128 channels.
+        self.enc3 = EncoderBlock(128, 256)             # Output: features with 256 channels.
+        self.enc4 = EncoderBlock(256, 512)             # Output: features with 512 channels.
         
-        # Center block (bottom of the U)
-        self.center = nn.Sequential(
-            nn.Conv2d(512, 1024, kernel_size=3, padding=1),
-            nn.BatchNorm2d(1024),
-            nn.ReLU(inplace=True),
-            nn.Conv2d(1024, 1024, kernel_size=3, padding=1),
-            nn.BatchNorm2d(1024),
-            nn.ReLU(inplace=True),
-        )
+        # Center block (Bottleneck): No pooling.
+        self.center = ConvBlock(512, 1024)
         
-        # Decoder: upsampling
-        self.decoder4 = DecoderBlock(1024, 512)
-        self.decoder3 = DecoderBlock(512, 256)
-        self.decoder2 = DecoderBlock(256, 128)
-        self.decoder1 = DecoderBlock(128, 64)
+        # Decoder: Upsample and merge with skip connections.
+        self.dec4 = DecoderBlock(1024, 512)
+        self.dec3 = DecoderBlock(512, 256)
+        self.dec2 = DecoderBlock(256, 128)
+        self.dec1 = DecoderBlock(128, 64)
         
-        # Final 1x1 convolution
+        # Final 1x1 convolution to map to the desired number of output classes.
         self.final_conv = nn.Conv2d(64, out_channels, kernel_size=1)
-
+    
     def forward(self, x):
-        # Encoder path with skip connections
-        enc1, skip1 = self.encoder1(x)  # enc1: pooled, skip1: features from block 1
-        enc2, skip2 = self.encoder2(enc1)
-        enc3, skip3 = self.encoder3(enc2)
-        enc4, skip4 = self.encoder4(enc3)
+        # Encoder pathway: Each block returns the pooled features and the skip connection.
+        enc1_pool, skip1 = self.enc1(x)   # Resolution: 1/2 of input.
+        enc2_pool, skip2 = self.enc2(enc1_pool)  # Resolution: 1/4 of input.
+        enc3_pool, skip3 = self.enc3(enc2_pool)  # Resolution: 1/8 of input.
+        enc4_pool, skip4 = self.enc4(enc3_pool)  # Resolution: 1/16 of input.
         
-        center = self.center(enc4)
+        # Center bottleneck block.
+        center = self.center(enc4_pool)
         
-        # Decoder path with skip connection concatenation
-        dec4 = self.decoder4(center, skip4)
-        dec3 = self.decoder3(dec4, skip3)
-        dec2 = self.decoder2(dec3, skip2)
-        dec1 = self.decoder1(dec2, skip1)
+        # Decoder pathway: Upsample and concatenate with corresponding skip connections.
+        dec4 = self.dec4(center, skip4)   # Upsampled to resolution 1/8.
+        dec3 = self.dec3(dec4, skip3)       # Upsampled to resolution 1/4.
+        dec2 = self.dec2(dec3, skip2)       # Upsampled to resolution 1/2.
+        dec1 = self.dec1(dec2, skip1)       # Upsampled to full resolution.
         
+        # Final output layer.
         out = self.final_conv(dec1)
-        return out
+        return out  

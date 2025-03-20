@@ -1,11 +1,33 @@
 import torch
 import os
+import random
+import numpy as np
 
 from utils import parse_arguments
 from models.unet import UNet
 from models.resnet34_unet import ResNet34_UNet
 from evaluate import evaluate
 from oxford_pet import OxfordPetData
+
+seed = 42
+
+# Set the Python built-in random module seed
+random.seed(seed)
+
+# Set the NumPy random seed
+np.random.seed(seed)
+
+# Set the PyTorch random seed for CPU
+torch.manual_seed(seed)
+
+# If using GPU, set the PyTorch CUDA random seed
+if torch.cuda.is_available():
+    torch.cuda.manual_seed(seed)
+    torch.cuda.manual_seed_all(seed)
+
+# For deterministic behavior in cuDNN
+torch.backends.cudnn.deterministic = True
+torch.backends.cudnn.benchmark = False
 
 if __name__ == "__main__":
     args = parse_arguments()
@@ -19,7 +41,7 @@ if __name__ == "__main__":
     if args.load_pt != "":
         ckpt_dir = os.path.join(args.root,"saved_models/",args.load_pt)
     else:
-        ckpt_dir = os.path.join(args.root,"saved_models/",f"{args.model}_best_model.pt")
+        ckpt_dir = os.path.join(args.root,"saved_models/",f"{args.model}_best_model.pth")
     try:
         checkpoint = torch.load(ckpt_dir)
         model.load_state_dict(checkpoint['model_state_dict'])
