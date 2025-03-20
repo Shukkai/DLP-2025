@@ -46,11 +46,12 @@ if __name__ == "__main__":
         checkpoint = torch.load(ckpt_dir)
         model.load_state_dict(checkpoint['model_state_dict'])
         print(f"✅ Loading model from {ckpt_dir}'")
-    except:
-        print(f"❌ Can't load model from {ckpt_dir}, retype correct relative path")
+    except Exception as e:
+        print(f"❌ Can't load model from {ckpt_dir}, retype the correct relative path")
+        raise RuntimeError(f"Model loading failed from {ckpt_dir}") from e
 
     data_module = OxfordPetData(root_dir=args.root, batch_size=args.batch, num_workers=8)
     _, _, test_loader = data_module.get_dataloaders()
     print("####Testing####")
-    dice = evaluate(device=device, model=model, test_loader=test_loader)
+    dice = evaluate(device=device, model=model, test_loader=test_loader, args = args)
     print(f"Dice score : {dice:.4f}")

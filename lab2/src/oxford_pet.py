@@ -2,6 +2,7 @@ import os
 import argparse
 import numpy as np
 import pandas as pd
+from tqdm import tqdm
 import random
 from PIL import Image
 from sklearn.model_selection import train_test_split
@@ -9,7 +10,8 @@ import torch
 from torch.utils.data import Dataset, DataLoader
 import torch.nn.functional as F
 import torchvision.transforms.functional as TF
-
+from urllib.request import urlretrieve
+import shutil
 seed = 42
 
 # Set the Python built-in random module seed
@@ -59,6 +61,10 @@ class Read_data(Dataset):
         self.H = H
         self.W = W
         self.data_path = root
+        if not os.path.exists(self.data_path):
+            print(f"Directory '{self.data_path}' does not exist. Creating it now...")
+            os.makedirs(self.data_path)
+        self.download(self.data_path)
         df = pd.read_csv(list_file, sep=" ", header=None)
         names = df[0].values
         self.image_paths = [os.path.join(self.data_path, f"images/{name}.jpg") for name in names]
@@ -103,6 +109,24 @@ class Read_data(Dataset):
             print(f"Skipping corrupted image: {img_path}, Error: {e}")
             return None, None  # Handle corrupted images
 
+    @staticmethod
+    def download(root):
+
+        # load images
+        filepath = os.path.join(root, "images.tar.gz")
+        download_url(
+            url="https://www.robots.ox.ac.uk/~vgg/data/pets/data/images.tar.gz",
+            filepath=filepath,
+        )
+        extract_archive(filepath)
+
+        # load annotations
+        filepath = os.path.join(root, "annotations.tar.gz")
+        download_url(
+            url="https://www.robots.ox.ac.uk/~vgg/data/pets/data/annotations.tar.gz",
+            filepath=filepath,
+        )
+        extract_archive(filepath)
 class OxfordPetData:
     def __init__(self, root_dir, batch_size=8, num_workers=8, H=256, W=256):
         """
@@ -124,6 +148,7 @@ class OxfordPetData:
         
         # Create the full train+val dataset using the trainval file
         full_dataset = Read_data(self.root_dir, trainval_file, H=self.H, W=self.W)
+        full_dataset.download(self.root_dir)
         
         # Split indices into train and validation sets
         indices = list(range(len(full_dataset)))
@@ -139,5 +164,35 @@ class OxfordPetData:
         valid_loader = DataLoader(self.valid_dataset, batch_size=self.batch_size, shuffle=False, num_workers=self.num_workers,pin_memory=True)
         test_loader = DataLoader(self.test_dataset, batch_size=self.batch_size, shuffle=False, num_workers=self.num_workers,pin_memory=True)
         return train_loader, valid_loader, test_loader
+
+class TqdmUpTo(tqdm):
+    def update_to(self, b=1, bsize=1, tsize=None):
+        if tsize is not None:
+            self.total = tsize
+        self.update(b * bsize - self.n)
+
+
+def download_url(url, filepath):
+    directory = os.path.dirname(os.path.abspath(filepath))
+    os.makedirs(directory, exist_ok=True)
+    if os.path.exists(filepath):
+        return
+
+    with TqdmUpTo(
+        unit="B",
+        unit_scale=True,
+        unit_divisor=1024,
+        miniters=1,
+        desc=os.path.basename(filepath),
+    ) as t:
+        urlretrieve(url, filename=filepath, reporthook=t.update_to, data=None)
+        t.total = t.n
+
+
+def extract_archive(filepath):
+    extract_dir = os.path.dirname(os.path.abspath(filepath))
+    dst_dir = os.path.splitext(filepath)[0]
+    if not os.path.exists(dst_dir):
+        shutil.unpack_archive(filepath, extract_dir)
 
 

@@ -110,16 +110,16 @@ def train(args, model, train_loader, valid_loader):
         # Save Metrics
         losses.append(train_loss)
         dices.append(dice)
-    with open(f"./saved_data/{args.model}_{args.loss_func}_{args.learning_rate}_{args.optim}_{args.scheduler}_loss_cmp.txt","a") as f:
-        f.write(f"losses :\n")
-        output_str = "\n".join(str(item) for item in losses)
-        f.write(output_str)
-    with open(f"./saved_data/{args.model}_{args.loss_func}_{args.learning_rate}_{args.optim}_{args.scheduler}_dice_cmp.txt","a") as f:
-        f.write(f"dices :\n")
-        output_str = "\n".join(str(item) for item in dices)
-        f.write(output_str)
-    save_dir = os.path.join("./saved_fig",f"{args.model}_{args.loss_func}_lr{args.learning_rate}_loss_dice.png")
-    plot_metrics(save_dir = save_dir,epochs= args.epoches, loss_values=losses, dice_scores= dices)
+    # with open(f"{args.root}/saved_data/{args.model}_{args.loss_func}_{args.learning_rate}_{args.optim}_{args.scheduler}_loss_cmp.txt","a") as f:
+    #     f.write(f"losses :\n")
+    #     output_str = "\n".join(str(item) for item in losses)
+    #     f.write(output_str)
+    # with open(f"{args.root}/saved_data/{args.model}_{args.loss_func}_{args.learning_rate}_{args.optim}_{args.scheduler}_dice_cmp.txt","a") as f:
+    #     f.write(f"dices :\n")
+    #     output_str = "\n".join(str(item) for item in dices)
+    #     f.write(output_str)
+    # save_dir = os.path.join(args.root,"saved_fig",f"{args.model}_{args.loss_func}_lr{args.learning_rate}_loss_dice.png")
+    # plot_metrics(save_dir = save_dir,epochs= args.epoches, loss_values=losses, dice_scores= dices)
 
 
 if __name__ == "__main__":

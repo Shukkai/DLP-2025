@@ -1,11 +1,12 @@
 import torch
 import os
+import argparse
 from tqdm import tqdm
 from PIL import Image
 import numpy as np
 from utils import dice_score
 
-def plot_result(name, img, mask, pred_mask, W=256, H=256, num_classes=2):
+def plot_result(name, img, mask, pred_mask, W=256, H=256, num_classes=2, save_dir = "../results"):
     sep_width = 10  # White separator width
 
     # Extract the first sample from the batch
@@ -43,7 +44,7 @@ def plot_result(name, img, mask, pred_mask, W=256, H=256, num_classes=2):
     final_img.paste(pred_pil, (W * 2 + sep_width * 2, 0))
     
     # ---- Save the result ----
-    save_dir = "./result"
+    save_dir = os.path.join(save_dir,"result")
     if not os.path.exists(save_dir):
         print(f"Directory '{save_dir}' does not exist. Creating it now...")
         os.makedirs(save_dir)
@@ -51,7 +52,7 @@ def plot_result(name, img, mask, pred_mask, W=256, H=256, num_classes=2):
     save_path = os.path.join(save_dir, f"{name}.png")
     final_img.save(save_path)
 
-def evaluate(device, model, test_loader):
+def evaluate(device, model, test_loader, args):
     
     model.to(device)
     model.eval()
@@ -63,6 +64,6 @@ def evaluate(device, model, test_loader):
             pred_mask = torch.sigmoid(pred_mask)
             pred_mask = pred_mask > 0.4 #best 0.4
             sum += dice_score(pred_mask, mask)
-            if i % 10 == 0:
-                plot_result(i, img=img, mask=mask, pred_mask=pred_mask)
+            # if i % 10 == 0:
+            #     plot_result(i, img=img, mask=mask, pred_mask=pred_mask, save_dir=args.root)
     return sum / len(test_loader)
