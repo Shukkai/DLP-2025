@@ -1,0 +1,14 @@
+# Ignore image files and PyTorch model files
+*.png
+*.jpg
+*.pt
+
+# Ignore the Oxford-IIIT Pet dataset folder
+/dataset/oxford-iiit-pet/
+
+# Ignore Visual Studio Code settings
+.vscode/
+
+# Ignore Python cache directories
+__pycache__/
+.pycache/
