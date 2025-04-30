@@ -1,0 +1,16 @@
+# Ignore image files and PyTorch model files
+*.png
+*.jpg
+*.pt
+
+# Ignore Visual Studio Code settings
+.vscode/
+
+# Ignore Python cache directories
+__pycache__/
+.pycache
+
+LAB5_110550110
+*.DS_Store
+*.Rhistory
+
